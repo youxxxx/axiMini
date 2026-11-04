@@ -1,13 +1,15 @@
 ---
 name: user-profile-competitive-programmer
-description: "User background — competitive programmer, comfortable with low-level features and time complexity; less familiar with other areas (likely ML/security tooling/devops)"
+description: "User background — strong competitive programmer (Codeforces Master), comfortable with low-level features and time complexity; less familiar with other areas (likely ML/security tooling/devops)"
 metadata:
-  node_type: memory
   type: user
-  originSessionId: 72150f88-ae41-4336-aa46-77a0699025d7
-  modified: 2026-11-04T07:27:12.917Z
+  modified: 2026-11-04
 ---
 
-The user does competitive programming (GitHub youxxxx/Competitive_Programming with a `Codeforces` folder; Codeforces handle `youx`). They said they are more familiar with concepts like low-level features and time complexity than with others. They asked that this not be taken too seriously.
+The user does competitive programming (GitHub youxxxx/Competitive_Programming with a `Codeforces` folder; Codeforces handle `youx`).
+- Codeforces (from a saved profile page the user supplied on 2026-11-04): **Master, rating 2105 (= max)**, **914 problems solved**, registered ~2018, rated activity mostly 2018–2020, little recent activity.
+- So: strong on algorithms, data structures, complexity analysis, and writing correct, efficient code under constraints. Likely C++-centric, so Python idioms and the library ecosystem may be less familiar.
 
-**How to apply:** Explain things through algorithms and complexity and bytes/memory layout when it helps (e.g. entropy as an O(n) histogram, PE as an offset/RVA structure). Spend more explanation on ML evaluation, security tooling, Docker, and web/UI pieces. Don't over-explain basic algorithms. Don't re-scan their profile sites; they asked for a single scan. Related: [[feedback-axiMini-working-rules]].
+They said they are more familiar with low-level features and time complexity than with other concepts, and asked that this not be taken too seriously.
+
+**How to apply:** Explain things through algorithms, complexity, and bytes/memory layout when it helps (e.g. entropy as an O(n) histogram, PE as an offset/RVA structure, feature hashing as hashing into buckets). Assume CP-level algorithm knowledge; never explain basic algorithms or big-O. Spend explanation on ML evaluation (splits, thresholds, leakage, metrics), security tooling, Docker/OS isolation, Python packaging, and web/UI pieces. Comparisons to C++ (memmap ≈ mmap, GIL vs threads) are useful. Don't re-scan their profile sites. Related: [[feedback-axiMini-working-rules]].
