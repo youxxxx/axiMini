@@ -1,1 +1,22 @@
-.pdf
+# Reference material
+*.pdf
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Large / generated artifacts (datasets, trained models, runtime state)
+data/
+models/
+quarantine/
+watched/
+*.db
+*.db-wal
+*.db-shm
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db

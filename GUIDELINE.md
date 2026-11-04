@@ -33,7 +33,7 @@
 **Day 1 — Static engine (offline, no Docker needed)**
 1. Environment setup (see §4), repo skeleton, `requirements.txt`.
 2. PE parser + feature extractor; unit-test on `C:\Windows\System32\*.exe`.
-3. Get training data (EMBER2024 vectorized features — no live malware). Train LightGBM.
+3. Get training data: EMBER2024 `Win32_test` raw features (4.9 GB, no live malware), split by week into train/val/test. Train LightGBM.
 4. Evaluate: ROC-AUC, F1, FPR at the chosen threshold, per-file latency (p50/p95).
 5. CLI: `python -m axi.scan <file>` → score + verdict + top features.
 
@@ -70,7 +70,7 @@ axiMini/
 |------|-----|-----------|
 | Python 3.11 or 3.12 + venv | all code | **Yes** |
 | Git | versioning | Yes (already present) |
-| Docker Desktop (WSL 2 backend) | Stage-2 sandbox | **Yes for Day 2** |
+| Docker Desktop (WSL 2 backend) | Stage-2 sandbox | **Yes for Day 2** (installed, but WSL is missing; see log 02) |
 | ~10–20 GB free disk | dataset subset + Docker image | Yes |
 | Windows VM (Hyper-V/VirtualBox, host-only network, snapshots) | only if you later want to handle **real** malware | **No** for the lite version |
 

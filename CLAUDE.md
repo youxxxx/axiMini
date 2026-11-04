@@ -7,3 +7,10 @@
 ## Language Protocol
   * Internal & Logs: Write all system logs, documentation, comments, and internal reasoning in English.
   * User Interface (UI): Render all final consumer-facing UI text, labels, and display outputs in Korean.
+
+
+## Claude Notes (auto-imported)
+  Claude's own working notes for this project (user instructions, user profile, current status). Keep them updated.
+  @claude-notes/working-rules.md
+  @claude-notes/user-profile.md
+  @claude-notes/project-status.md
