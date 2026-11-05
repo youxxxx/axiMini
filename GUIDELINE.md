@@ -91,7 +91,7 @@ pre-vectorized features; the sandbox runs only our own harmless simulated progra
 ## 6. Definition of done
 
 - [ ] `scan` CLI gives a verdict for any PE in < 50 ms (p95, after model load)
-- [ ] Reported metrics: ROC-AUC, F1, FPR at chosen threshold (target FPR ≤ 0.1%)
+- [x] Reported metrics: ROC-AUC, F1, FPR at chosen threshold (target FPR ≤ 0.1%): val 0.10%, **test 0.21%** (drift, log 10)
 - [ ] Dropping a file into the watched folder shows up in the dashboard within ~1 s
 - [ ] High-score files are moved to `quarantine/`
 - [ ] Mid-score files produce a sandbox behaviour summary (demo samples)
