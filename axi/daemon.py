@@ -36,7 +36,7 @@ from pathlib import Path
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-from axi import config, store
+from axi import config, quarantine, store
 
 DEBOUNCE_S = 0.5            # quiet time after the last event before a file is considered
 STABLE_S = 0.2              # size+mtime must be unchanged across a check this far apart
@@ -44,7 +44,9 @@ TICK_S = 0.1                # stabilizer polling period
 MAX_WAIT_S = 120.0          # give up waiting for a file that never stabilizes / stays locked
 EXPLAIN_TOP = 8
 EXPLAIN_VERDICTS = {"sandbox", "quarantine"}
-IGNORED_SUFFIXES = {".crdownload", ".part", ".partial", ".download", ".tmp", ".swp"}
+IGNORED_SUFFIXES = {".crdownload", ".part", ".partial", ".download", ".tmp", ".swp",
+                    quarantine.TMP_SUFFIX}   # our own "held" name during a quarantine move
+ACTION_VERDICTS = {"quarantine"}   # verdicts that trigger an automatic action (sandbox: Step 3)
 IGNORED_PREFIXES = ("~$", ".~")   # Office lock files, editor temp files
 
 log = logging.getLogger("axi.daemon")
@@ -190,13 +192,17 @@ def stabilizer(pending: Pending, ready: "queue.Queue[Job]", last_scanned: dict,
 _scanner = None
 
 
-def _init_worker() -> None:
+def _init_worker(t_high_override: float | None = None) -> None:
     """Runs once in each worker process (Windows 'spawn': a fresh interpreter, ~3 s import)."""
     global _scanner
     import warnings
     warnings.filterwarnings("ignore")
     from axi.scan import Scanner
     _scanner = Scanner()
+    if t_high_override is not None:
+        # DEMO ONLY (log 15 §5): there is no live malware in this project, so nothing reaches the
+        # real T_high. Lowering it lets the quarantine path be exercised on a real file.
+        _scanner.model.t_high = t_high_override
 
 
 def _scan_job(path: str) -> dict:
@@ -213,7 +219,7 @@ VERDICT_LINE = {
 
 def dispatcher(ready: "queue.Queue[Job]", pool: ProcessPoolExecutor, workers: int,
                db_path: Path, model_sha: str, last_scanned: dict, stop: threading.Event,
-               stats: dict) -> None:
+               stats: dict, vault: Path = config.QUARANTINE_DIR) -> None:
     con = store.connect(db_path)
     inflight = {}
     max_inflight = workers * 2   # backpressure: at most 2 queued jobs per worker in the pool
@@ -236,17 +242,46 @@ def dispatcher(ready: "queue.Queue[Job]", pool: ProcessPoolExecutor, workers: in
             except Exception as e:  # a crashed worker must not kill the daemon
                 res = {"path": job.path, "verdict": "error", "error": f"작업자 오류: {e!r}"}
             last_scanned[job.path] = (job.size, job.mtime_ns)
-            row = store.insert_event(con, first_seen=job.first_seen, path=job.path, result=res,
-                                     model_sha256=model_sha if res.get("score") is not None else None)
-            stats[res["verdict"]] = stats.get(res["verdict"], 0) + 1
-            score = f"{res['score']:.6f}" if res.get("score") is not None else "-"
-            ms = res.get("ms", {})
-            log.info("%s  %s  (점수 %s, 추출 %.0f ms, 감지→판정 %.0f ms, #%d)",
-                     VERDICT_LINE[res["verdict"]], job.path, score, ms.get("extract", 0),
-                     (time.time() - job.first_seen) * 1e3, row)
-            if res.get("error"):
-                log.info("     └ %s", res["error"])
+            handle_result(con, job, res, model_sha, vault, stats)
     con.close()
+
+
+ACTION_KO = {
+    "quarantined": "격리 완료", "already_quarantined": "격리 완료 (동일 파일 기존 격리본 있음)",
+    "allowlisted": "허용 목록 파일 - 조치 안 함", "changed": "검사 후 내용 변경 - 재검사 대기",
+    "locked": "격리 실패 (사용 중)", "missing": "격리 생략 (파일 없음)",
+    "copied_not_removed": "격리 사본 저장, 원본 삭제 실패",
+}
+
+
+def handle_result(con, job: Job, res: dict, model_sha: str, vault: Path, stats: dict) -> int:
+    """Record the verdict, then act on it. Order: record -> allowlist check -> action -> record."""
+    row = store.insert_event(con, first_seen=job.first_seen, path=job.path, result=res,
+                             model_sha256=model_sha if res.get("score") is not None else None)
+    stats[res["verdict"]] = stats.get(res["verdict"], 0) + 1
+    score = f"{res['score']:.6f}" if res.get("score") is not None else "-"
+    ms = res.get("ms", {})
+    log.info("%s  %s  (점수 %s, 추출 %.0f ms, 감지→판정 %.0f ms, #%d)",
+             VERDICT_LINE[res["verdict"]], job.path, score, ms.get("extract", 0),
+             (time.time() - job.first_seen) * 1e3, row)
+    if res.get("error"):
+        log.info("     └ %s", res["error"])
+
+    if res["verdict"] not in ACTION_VERDICTS:
+        return row
+    sha = res.get("sha256")
+    if store.is_allowed(con, sha):
+        # An analyst already judged this exact content benign (usually: restored from quarantine).
+        status, detail = "allowlisted", "허용 목록 (오탐 처리된 해시)"
+    else:
+        q = quarantine.quarantine_file(job.path, sha, {
+            "event_id": row, "score": res.get("score"), "verdict": res["verdict"],
+            "model_sha256": model_sha, "top_features": res.get("top", [])[:5]}, vault=vault)
+        status, detail = q.status, q.detail
+        store.log_action(con, f"quarantine:{status}", q.sha256 or sha, detail, row)
+    store.set_event_action(con, row, status, detail)
+    log.info("     └ %s: %s", ACTION_KO.get(status, status), detail)
+    return row
 
 
 # ---------------------------------------------------------------- main
@@ -263,7 +298,8 @@ def initial_scan(root: Path, pending: Pending) -> int:
 
 
 def run(watch_dir: Path, workers: int, initial: bool, db_path: Path = config.DB_PATH,
-        stop: threading.Event | None = None) -> dict:
+        stop: threading.Event | None = None, vault: Path = config.QUARANTINE_DIR,
+        demo_t_high: float | None = None) -> dict:
     import json
     watch_dir.mkdir(parents=True, exist_ok=True)
     model_sha = json.loads(config.MODEL_META_PATH.read_text())["model_sha256"]
@@ -271,7 +307,11 @@ def run(watch_dir: Path, workers: int, initial: bool, db_path: Path = config.DB_
     pending, ready, last_scanned, stats = Pending(), queue.Queue(maxsize=10_000), {}, {}
 
     log.info("작업자 프로세스 %d개 시작 중 (모델 로드)...", workers)
-    pool = ProcessPoolExecutor(max_workers=workers, initializer=_init_worker)
+    if demo_t_high is not None:
+        log.warning("⚠️ 데모 모드: 격리 임계값을 %.4f로 낮춤 (실제 값 %.6f). 운영 환경에서 사용 금지!",
+                    demo_t_high, json.loads(config.MODEL_META_PATH.read_text())["t_high"])
+    pool = ProcessPoolExecutor(max_workers=workers, initializer=_init_worker,
+                               initargs=(demo_t_high,))
     for f in [pool.submit(int, 0) for _ in range(workers)]:
         f.result()   # forces every worker to spawn + load the model before we start watching
     observer = Observer()
@@ -283,7 +323,7 @@ def run(watch_dir: Path, workers: int, initial: bool, db_path: Path = config.DB_
         threading.Thread(target=stabilizer, args=(pending, ready, last_scanned, stop),
                          name="stabilizer", daemon=True),
         threading.Thread(target=dispatcher, args=(ready, pool, workers, db_path, model_sha,
-                                                  last_scanned, stop, stats),
+                                                  last_scanned, stop, stats, vault),
                          name="dispatcher", daemon=True),
     ]
     for t in threads:
@@ -313,11 +353,12 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=2, help="검사 작업자 프로세스 수")
     ap.add_argument("--db", type=Path, default=config.DB_PATH, help="이벤트 DB 경로")
     ap.add_argument("--no-initial-scan", action="store_true", help="시작 시 기존 파일 검사 생략")
+    ap.add_argument("--demo-t-high", type=float, help="[데모 전용] 격리 임계값 임시 변경")
     a = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S",
                         stream=sys.stdout)
     signal.signal(signal.SIGINT, signal.default_int_handler)
-    run(a.dir, a.workers, not a.no_initial_scan, a.db)
+    run(a.dir, a.workers, not a.no_initial_scan, a.db, demo_t_high=a.demo_t_high)
 
 
 if __name__ == "__main__":

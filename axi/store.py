@@ -14,7 +14,7 @@ from pathlib import Path
 
 from axi import config
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2   # 2: + allowlist, actions (CREATE IF NOT EXISTS, so v1 DBs upgrade in place)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -38,6 +38,24 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS ix_events_scanned_at ON events(scanned_at);
 CREATE INDEX IF NOT EXISTS ix_events_verdict    ON events(verdict);
 CREATE INDEX IF NOT EXISTS ix_events_sha256     ON events(sha256);
+
+-- Analyst-approved hashes (false positives). Checked BEFORE any action is taken (log 15 §4).
+CREATE TABLE IF NOT EXISTS allowlist (
+    sha256    TEXT PRIMARY KEY,
+    added_at  REAL NOT NULL,
+    reason    TEXT
+);
+
+-- Audit trail of everything done to files: quarantine, restore, delete, allowlist.
+CREATE TABLE IF NOT EXISTS actions (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts        REAL NOT NULL,
+    sha256    TEXT,
+    action    TEXT NOT NULL,
+    detail    TEXT,
+    event_id  INTEGER REFERENCES events(id)
+);
+CREATE INDEX IF NOT EXISTS ix_actions_sha256 ON actions(sha256);
 """
 
 
@@ -76,6 +94,30 @@ def insert_event(con: sqlite3.Connection, *, first_seen: float, path: str, resul
     )
     con.commit()
     return cur.lastrowid
+
+
+def set_event_action(con: sqlite3.Connection, event_id: int, action: str, detail: str) -> None:
+    con.execute("UPDATE events SET action=?, action_detail=? WHERE id=?", (action, detail, event_id))
+    con.commit()
+
+
+def log_action(con: sqlite3.Connection, action: str, sha256: str | None, detail: str = "",
+               event_id: int | None = None) -> None:
+    con.execute("INSERT INTO actions (ts, sha256, action, detail, event_id) VALUES (?,?,?,?,?)",
+                (time.time(), sha256, action, detail, event_id))
+    con.commit()
+
+
+def is_allowed(con: sqlite3.Connection, sha256: str | None) -> bool:
+    return bool(sha256) and con.execute(
+        "SELECT 1 FROM allowlist WHERE sha256=?", (sha256,)).fetchone() is not None
+
+
+def allow(con: sqlite3.Connection, sha256: str, reason: str = "") -> None:
+    con.execute("INSERT OR REPLACE INTO allowlist (sha256, added_at, reason) VALUES (?,?,?)",
+                (sha256, time.time(), reason))
+    con.commit()
+    log_action(con, "allowlist", sha256, reason)
 
 
 def recent_events(con: sqlite3.Connection, limit: int = 100) -> list[sqlite3.Row]:
