@@ -107,6 +107,8 @@ The same Python class produces the training vectors (from the JSON the EMBER aut
 ⚠️ **A remaining subtlety:** the dataset JSON was produced with *their* pefile version. If our pefile version parses some edge cases differently, a few fields can drift. For this lite project that's acceptable. A production system would pin the exact pefile version used to build the dataset.
 
 ### 3.3 Data plan decision: use **Win32_test only (4.9 GB)**, not Win32_train (23.7 GB)
+
+> **Correction (2026-11-05, see log 04):** the RAM argument below overstates the problem. LightGBM can build its training set chunk by chunk (`lightgbm.Sequence`) and keeps only ~1 byte per value after binning, so the full Win32 train set is feasible in 16 GB. The subset choice still holds, but for download, vectorization, and iteration time, not RAM.
 - **RAM math:** EMBER2024 has about 2.6 M training files across all types. If Win32 is roughly half, say ~1.3 M rows, then 1.3 M × 2568 features × 4 bytes ≈ **13 GB**. Add LightGBM's own binned copy and Python overhead, and that **doesn't fit in 16 GB**. The test zip is about ⅕ the size, around 250–350 k Win32 rows, so ≈ 3 GB. That fits comfortably.
 - **Time:** training on ~200 k rows takes minutes on 16 threads. On ~1.3 M it would take tens of minutes per run. Since you're learning, more short experiments beat one long run.
 - **Is it still a valid experiment?** Yes, as long as we **split by time**. EMBER2024's samples are tagged by **collection week**. Malware evolves (concept drift), so a random shuffle split would put "future" samples in training and inflate scores. We'll use the earliest weeks for train, the next for validation (threshold picking), and the latest for test. That mimics deployment: train on the past, face the future.

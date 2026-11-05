@@ -12,7 +12,7 @@ No live malware in the lite version.
 ## Decisions so far
 - Feature extractor + data: EMBER2024 `thrember` (feature v3, dim 2568, pure pefile). Same extractor for training (`process_raw_features` on jsonl) and scanning (`feature_vector` on bytes).
 - Data subset: **Win32_test.zip only (4.9 GB)**, split by week into train/val/test (temporal split). Full Win32 train (23.7 GB) is an optional upgrade.
-- Don't use `thrember.read_vectorized_features` for big subsets: it loads everything into RAM (16 GB machine). Use our own memmap + sampling.
+- Don't use `thrember.read_vectorized_features` for big subsets: it loads everything into RAM (16 GB machine). Instead, feed LightGBM through a `lightgbm.Sequence` over our `np.memmap` files, so the raw float32 matrix never sits in RAM; only the binned Dataset (~1 B/value) does. Then going from Win32_test to Win32_train is a config change (decided 2026-11-05, log 04).
 - Known thrember quirks: labels written float32 but read int32; `read_metadata` builds challenge DF from test records; download functions `os.chdir()`.
 
 ## Machine
