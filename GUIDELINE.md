@@ -92,7 +92,7 @@ pre-vectorized features; the sandbox runs only our own harmless simulated progra
 
 - [~] `scan` CLI gives a verdict for any PE in < 50 ms (p95, after model load): **p50 30–36 ms met; p95 278–355 ms not met** (exact pefile parse dominates on big DLLs; log 12 §4)
 - [x] Reported metrics: ROC-AUC, F1, FPR at chosen threshold (target FPR ≤ 0.1%): val 0.10%, **test 0.21%** (drift, log 10)
-- [ ] Dropping a file into the watched folder shows up in the dashboard within ~1 s
+- [x] Dropping a file into the watched folder shows up in the dashboard within ~1 s (log 18, auto-refresh 3s)
 - [x] High-score files are moved to `quarantine/` (neutralized, restorable, allowlist on restore; log 15)
 - [x] Mid-score files produce a sandbox behaviour summary (demo samples): `python -m axi.sandbox run-sample <name>` (log 17)
-- [ ] Dashboard text is Korean; code/comments/logs are English
+- [x] Dashboard text is Korean; code/comments/logs are English (log 18)
