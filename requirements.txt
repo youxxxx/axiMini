@@ -5,6 +5,7 @@ thrember @ git+https://github.com/FutureComputing4AI/EMBER2024@0ef753e81d98bf209
 # thrember imports `signify.authenticode.SignedPEFile` and calls `iter_signed_datas`; signify 0.9.0
 # removed/renamed both. Pin to the 0.7 line (what EMBER2024 was built with) — see logs/2026-11-05_07.
 signify>=0.7.1,<0.8
+huggingface_hub>=0.24  # scripts/download_ember.py imports it directly (also pulled in by thrember)
 lightgbm>=4.6.0
 pefile>=2024.8.26
 numpy>=2.0
