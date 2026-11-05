@@ -57,7 +57,10 @@ class Scanner:
         # collector skips. Output is unaffected; non-PE scans drop from ~35 ms to ~0 (log 12 §3).
         gc.freeze()
 
-    def scan(self, path: str | Path, explain: int = 0) -> ScanResult:
+    def scan(self, path: str | Path, explain: int = 0,
+             explain_verdicts: set[str] | None = None) -> ScanResult:
+        """explain = top-k reasons to compute; explain_verdicts limits that to some verdicts
+        (the daemon passes {"sandbox", "quarantine"}: TreeSHAP is ~400x a predict)."""
         res = ScanResult(path=str(path))
         t0 = time.perf_counter()
         try:
@@ -98,7 +101,7 @@ class Scanner:
         res.score = float(self.model.score(x)[0])
         res.verdict = self.model.verdict(res.score)
         res.ms["predict"] = (time.perf_counter() - t2) * 1e3
-        if explain:
+        if explain and (explain_verdicts is None or res.verdict in explain_verdicts):
             t3 = time.perf_counter()
             res.top = self.explain(x, explain)
             res.ms["explain"] = (time.perf_counter() - t3) * 1e3
