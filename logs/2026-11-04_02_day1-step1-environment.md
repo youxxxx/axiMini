@@ -165,15 +165,16 @@ Only files that are used now were created. Modules like `features.py` and `model
 ## 6. 🔧 Your action items
 
 ### 6.1 Install Python packages (Day 1, needed now)
-In this Claude session, type the following (the `!` runs it here, so I can see the output):
+In this Claude session, type the following **one line at a time** (the `!` runs it here, so I can see the output).
+> Corrected 2026-11-05 (log 05): `!` runs in **bash**, where `\` is an escape character, so the paths must use forward slashes.
 ```
-! .venv\Scripts\python.exe -m pip install --upgrade pip
-! .venv\Scripts\python.exe -m pip install -r requirements.txt
-! .venv\Scripts\python.exe scripts\check_env.py
+! .venv/Scripts/python.exe -m pip install --upgrade pip
+! .venv/Scripts/python.exe -m pip install -r requirements.txt
+! .venv/Scripts/python.exe scripts/check_env.py
 ```
 Expected: all `[OK]` except possibly the Docker lines. Downloads total a few hundred MB, mostly streamlit, pandas, and lightgbm. Then pin thrember:
 ```
-! .venv\Scripts\python.exe -m pip freeze | findstr thrember
+! .venv/Scripts/python.exe -m pip freeze | grep thrember
 ```
 
 ### 6.2 Fix WSL so Docker can run (needed before Day 2)

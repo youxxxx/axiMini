@@ -1,7 +1,10 @@
 # Day 1 — static engine
 # EMBER2024 feature extractor + dataset helpers (not on PyPI; installed from GitHub).
-# After installing, pin the exact commit here: thrember @ git+https://github.com/FutureComputing4AI/EMBER2024@<commit>
-thrember @ git+https://github.com/FutureComputing4AI/EMBER2024
+# Pinned to the commit resolved on 2026-11-05 so upstream pushes cannot change our feature layout.
+thrember @ git+https://github.com/FutureComputing4AI/EMBER2024@0ef753e81d98bf209f71b03cd331dfc190b5b54d
+# thrember imports `signify.authenticode.SignedPEFile` and calls `iter_signed_datas`; signify 0.9.0
+# removed/renamed both. Pin to the 0.7 line (what EMBER2024 was built with) — see logs/2026-11-05_07.
+signify>=0.7.1,<0.8
 lightgbm>=4.6.0
 pefile>=2024.8.26
 numpy>=2.0
