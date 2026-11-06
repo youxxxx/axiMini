@@ -1,5 +1,9 @@
 # axiMini: Day 1 summary (static detection engine)
 
+> ⚠️ **Superseded by [`README.md`](README.md)** (2026-11-06). This file is kept as a
+> historical checkpoint at the end of Day 1. For up-to-date run instructions, the
+> daemon/quarantine/sandbox/dashboard commands, and current test counts, read the README.
+
 Day 1 builds the **static** half of the lite AI-EDR from `guide.pdf`. It reads a PE file's bytes without executing them, turns them into 2,568 numbers, scores them with a LightGBM model, and routes the file into one of three zones. Everything is offline: no Docker, and no live malware (the training data is pre-extracted features, not binaries).
 
 ```
